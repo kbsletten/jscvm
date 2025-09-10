@@ -5,25 +5,26 @@ import { keywords, operators, tokenize } from "./token.ts";
 
 function assertTokens(input, ...tokens) {
   let i = 0;
-  for (const token of tokenize(input)) {
-    assert.deepEqual(token, tokens[i++]);
+  for (const actual of tokenize(input)) {
+    const expected = tokens[i++];
+    assert.deepEqual(actual, expected, `${input}: Expected token ${i - 1} to be ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
   }
-  assert.equal(i, tokens.length);
+  assert.equal(i, tokens.length, `${input}: Expected ${tokens.length} tokens, got ${i}`);
 }
 
-test("tokens regex should parse keywords", () => {
+test("tokenize should parse keywords", () => {
   for (const keyword of keywords) {
     assertTokens(keyword, { type: keyword });
   }
 });
 
-test("tokens regex should parse identifiers", () => {
+test("tokenize should parse identifiers", () => {
   assertTokens(`a`, { type: "id", value: `a`, text: `a` });
   assertTokens(`_a`, { type: "id", value: `_a`, text: `_a` });
   assertTokens(`_a12`, { type: "id", value: `_a12`, text: `_a12` });
 });
 
-test("tokens regex should parse floating-point numbers", () => {
+test("tokenize should parse floating-point numbers", () => {
   assertTokens(`1.3`, { type: "float", value: 1.3, text: `1.3` });
   assertTokens(`1.e2`, { type: "float", value: 1e2, text: `1.e2` });
   assertTokens(`1e+2`, { type: "float", value: 1e2, text: `1e+2` });
@@ -31,7 +32,7 @@ test("tokens regex should parse floating-point numbers", () => {
   assertTokens(`1.f`, { type: "float", value: 1, text: `1.f` });
 });
 
-test("tokens regex should parse integer numbers", () => {
+test("tokenize should parse integer numbers", () => {
   assertTokens(`12345`, { type: "int", value: 12345, text: `12345` });
   assertTokens(`12345u`, { type: "int", value: 12345, text: `12345u` });
   assertTokens(`12345L`, { type: "int", value: 12345, text: `12345L` });
@@ -39,14 +40,14 @@ test("tokens regex should parse integer numbers", () => {
   assertTokens(`0xCAFE`, { type: "int", value: 51966, text: `0xCAFE` });
 });
 
-test("tokens regex should parse character constants", () => {
-  assertTokens(`'a'`, { type: "char", value: `a`, text: `'a'` });
-  assertTokens(`L'a'`, { type: "char", value: `a`, text: `L'a'` });
-  assertTokens(`'\\0'`, { type: "char", value: `\0'`, text: `'\\0'` });
-  assertTokens(`'\\\\'`, { type: "char", value: `\\`, text: `'\\\\'` });
+test("tokenize should parse character constants", () => {
+  assertTokens(`'a'`, { type: "char", value: 97, text: `'a'` });
+  assertTokens(`L'a'`, { type: "char", value: 97, text: `L'a'` });
+  assertTokens(`'\\0'`, { type: "char", value: 0, text: `'\\0'` });
+  assertTokens(`'\\\\'`, { type: "char", value: 92, text: `'\\\\'` });
 });
 
-test("tokens regex should parse string constants", () => {
+test("tokenize should parse string constants", () => {
   assertTokens(`""`, { type: "string", value: ``, text: `""` });
   assertTokens(`"a"`, { type: "string", value: `a`, text: `"a"` });
   assertTokens(`L"a"`, { type: "string", value: `a`, text: `L"a"` });
@@ -54,7 +55,7 @@ test("tokens regex should parse string constants", () => {
   assertTokens(`"\\\\"`, { type: "string", value: `\\`, text: `"\\\\"` });
 });
 
-test("tokens regex should parse operators", () => {
+test("tokenize should parse operators", () => {
   for (const operator of operators) {
     assertTokens(operator, { type: operator });
   }
