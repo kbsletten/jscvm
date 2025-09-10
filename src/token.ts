@@ -109,11 +109,11 @@ export type Token =
   | { type: "id"; value: string; text: string }
   | { type: "error"; text: string };
 
-export function* tokenize(input): Generator<Token> {
+export function* tokenize(input: string): Generator<Token> {
   for (const match of input.matchAll(tokens)) {
     const [text, key, flt, int, hex, oct, char, str, op, id] = match;
     if (key !== undefined) {
-      yield { type: key };
+      yield { type: key as Keywords };
     } else if (flt !== undefined) {
       yield { type: "float", value: parseFloat(flt), text };
     } else if (int !== undefined) {
@@ -212,7 +212,7 @@ export function* tokenize(input): Generator<Token> {
     } else if (str !== undefined) {
       yield { type: "string", value: str, text };
     } else if (op !== undefined) {
-      yield { type: op };
+      yield { type: op as Operators };
     } else if (id !== undefined) {
       yield { type: "id", value: id, text };
     } else {

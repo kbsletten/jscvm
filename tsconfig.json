@@ -1,11 +1,13 @@
 {
   "compilerOptions": {
-    "target": "esnext",
-    "module": "nodenext",
-    "rewriteRelativeImportExtensions": true,
+    "declaration": true,
     "erasableSyntaxOnly": true,
-    "verbatimModuleSyntax": true,
+    "module": "nodenext",
     "outDir": "dist",
+    "rewriteRelativeImportExtensions": true,
+    "strict": true,
+    "target": "esnext",
+    "verbatimModuleSyntax": true,
   },
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
