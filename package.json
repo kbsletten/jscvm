@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc",
     "lint": "prettier . --write",
-    "test": "node --test --test-reporter junit --test-reporter-destination test-results/node.xml src/**/*.test.ts"
+    "test": "node --test src/**/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "^24.3.1",
