@@ -5,6 +5,7 @@
     "rewriteRelativeImportExtensions": true,
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
-    "outDir": "dist"
-  }
+    "outDir": "dist",
+  },
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
