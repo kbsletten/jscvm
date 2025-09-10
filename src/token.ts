@@ -200,7 +200,7 @@ export function* tokenize(input: string): Generator<Token> {
           default:
             ch = Infinity;
             continue;
-	}
+        }
       } else if (char.length > 1) {
         ch = Infinity;
       }

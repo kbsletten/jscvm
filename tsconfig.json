@@ -7,7 +7,7 @@
     "rewriteRelativeImportExtensions": true,
     "strict": true,
     "target": "esnext",
-    "verbatimModuleSyntax": true,
+    "verbatimModuleSyntax": true
   },
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

@@ -7,9 +7,17 @@ function assertTokens(input, ...tokens) {
   let i = 0;
   for (const actual of tokenize(input)) {
     const expected = tokens[i++];
-    assert.deepEqual(actual, expected, `${input}: Expected token ${i - 1} to be ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+    assert.deepEqual(
+      actual,
+      expected,
+      `${input}: Expected token ${i - 1} to be ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+    );
   }
-  assert.equal(i, tokens.length, `${input}: Expected ${tokens.length} tokens, got ${i}`);
+  assert.equal(
+    i,
+    tokens.length,
+    `${input}: Expected ${tokens.length} tokens, got ${i}`,
+  );
 }
 
 test("tokenize should parse keywords", () => {
