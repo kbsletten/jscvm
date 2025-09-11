@@ -301,11 +301,26 @@ export function* tokenize(
       case 53 /* 5 */:
       case 54 /* 6 */:
       case 55 /* 7 */:
-        value = parseInt(char.substring(1), 8);
+        value = 0;
+        for (let i = 1; i < char.length; i++) {
+          value <<= 3;
+          value += char.charCodeAt(i) - 48;
+        }
         break;
       case 88 /* X */:
       case 120 /* x */:
-        value = parseInt(char.substring(2), 16);
+        value = 0;
+        for (let i = 2; i < char.length; i++) {
+          value <<= 4;
+          const c = char.charCodeAt(i);
+          if (c >= 48 /* 0 */ && c <= 57 /* 9 */) {
+            value += c - 48;
+          } else if (c >= 65 /* A */ && c <= 70 /* F */) {
+            value += c - 65 + 10;
+          } else {
+            value += c - 97 + 10;
+          }
+        }
         break;
       case 97 /* a */:
         value = 7 /* \a */;
