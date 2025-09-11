@@ -13,18 +13,32 @@ function assertTokens(input: string, ...expectedTokens: Token[]) {
   let i = 0;
   for (const actual of tokenize(input)) {
     const expected = expectedTokens[i++];
+
+    if (expected === undefined && actual.type === "eof") {
+      return;
+    }
+
     assert.deepEqual(
       actual,
       expected,
-      `${input}: Expected token ${i - 1} to be ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`
+      `${input}: Expected token ${i - 1} to be ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
     );
   }
   assert.equal(
     i,
     expectedTokens.length,
-    `${input}: Expected ${expectedTokens.length} tokens, got ${i}`
+    `${input}: Expected ${expectedTokens.length} tokens, got ${i}`,
   );
 }
+
+test("tokenize should parse whitespace", () => {
+  assertTokens(`   \t\n\r`, { type: "eof", text: `   \t\n\r` });
+  assertTokens(`/* comment */`, { type: "eof", text: `/* comment */` });
+  assertTokens(`   /* comment */ \n\t `, {
+    type: "eof",
+    text: `   /* comment */ \n\t `,
+  });
+});
 
 test("tokenize should parse keywords", () => {
   for (const keyword of keywords) {
@@ -56,7 +70,11 @@ test("tokenize should parse integer numbers", () => {
   });
   assertTokens(`12345L`, { type: "long int", value: 12345, text: `12345L` });
   assertTokens(`01234`, { type: "int", value: 668, text: `01234` });
-  assertTokens(`0xCAFE`, { type: "unsigned int", value: 51966, text: `0xCAFE` });
+  assertTokens(`0xCAFE`, {
+    type: "unsigned int",
+    value: 51966,
+    text: `0xCAFE`,
+  });
   assertTokens(`65535`, { type: "unsigned int", value: 65535, text: `65535` });
   assertTokens(`2147483647`, {
     type: "long int",
@@ -95,4 +113,18 @@ test("tokenize should parse operators", () => {
   for (const operator of operators) {
     assertTokens(operator, { type: operator, text: operator });
   }
+});
+
+test("tokenize should reject invalid input", () => {
+  assertTokens(`"unterminated`, { type: "error", text: `"unterminated` });
+  assertTokens(`'a`, { type: "error", text: `'a` });
+  assertTokens(
+    `int main() { @ }`,
+    { type: "int", text: "int" },
+    { type: "id", value: "main", text: " main" },
+    { type: "(", text: "(" },
+    { type: ")", text: ")" },
+    { type: "{", text: " {" },
+    { type: "error", text: " @ }" },
+  );
 });

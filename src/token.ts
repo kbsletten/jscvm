@@ -136,7 +136,7 @@ function optimize(...tokens: string[]) {
 }
 
 const tokens = new RegExp(
-  /* ws */ `(?:/\\*.*?\\*|\\s+)*(?:${[
+  /* ws */ `(?:/\\*.*?\\*/|\\s+)*(?:${[
     /* key */ `(${optimize(...keywords, ...operators, ...punctuators)})`,
     /* flt */ `([0-9]+(?:\\.[0-9]*(?:[eE][-+]?[0-9]+)?|[eE][-+]?[0-9]+))[fFlL]?`,
     /* int */ `([1-9][0-9]*)(?:[uU][lL]?|[lL][uU]?)?`,
@@ -145,9 +145,10 @@ const tokens = new RegExp(
     /* char */ `L?'((?:\\\\(?:[0-7]{1,3}|x[0-9A-Fa-f]+|['"?\\\\abfnrtv])|[^'"\\\\\\n]))'`,
     /* str */ `L?"((?:\\\\(?:[0-7]{1,3}|x[0-9A-Fa-f]+|['"?\\\\abfnrtv])|[^"\\\n])*)"`,
     /* id */ `([A-Za-z_][A-Za-z0-9_]*)`,
-    /* err */ `(.)`,
+    /* eof */ `($)`,
+    /* err */ `.+`,
   ].join("|")})`,
-  "g"
+  "g",
 );
 
 export type Token =
@@ -161,6 +162,7 @@ export type Token =
   | { type: "char" | "wchar"; value: number; text: string }
   | { type: "string" | "wstring"; value: string; text: string }
   | { type: "id"; value: string; text: string }
+  | { type: "eof"; text: string }
   | { type: "error"; text: string };
 
 interface TokenizerOptions {
@@ -174,7 +176,7 @@ interface TokenizerOptions {
 
 export function* tokenize(
   input: string,
-  options?: TokenizerOptions
+  options?: TokenizerOptions,
 ): Generator<Token> {
   const {
     intMax = 32767,
@@ -185,7 +187,7 @@ export function* tokenize(
     wcharMax = 32767,
   } = options ?? {};
   for (const match of input.matchAll(tokens)) {
-    const [text, key, flt, int, hex, oct, char, str, id, err] = match;
+    const [text, key, flt, int, hex, oct, char, str, id, eof, err] = match;
     if (key !== undefined) {
       yield { type: key as Keyword | Operator | Punctuator, text };
     } else if (flt !== undefined) {
@@ -203,33 +205,11 @@ export function* tokenize(
       const value = parseInt(int);
       const isLong = text.indexOf("l") !== -1 || text.indexOf("L") !== -1;
       const isUnsigned = text.indexOf("u") !== -1 || text.indexOf("U") !== -1;
-      if (value > longMax || (isUnsigned && (isLong || value > uintMax))) {
-        type = "unsigned long int";
-      } else if (value > uintMax || isLong) {
-        type = "long int";
-      } else if (value > intMax || isUnsigned) {
-        type = "unsigned int";
-      }
-      if (value > ulongMax) {
-        yield { type: "error", text };
-      } else {
-        yield { type, value, text };
-      }
+      yield intToken(value, text, isLong, isUnsigned);
     } else if (hex !== undefined) {
-      const value = parseInt(hex, 16);
-      if (value > ulongMax) {
-        yield { type: "error", text };
-      } else if (value > longMax) {
-        yield { type: "unsigned long int", value, text };
-      } else if (value > uintMax) {
-        yield { type: "long int", value, text };
-      } else if (value > intMax) {
-        yield { type: "unsigned int", value, text };
-      } else {
-        yield { type: "int", value, text };
-      }
+      yield intToken(parseInt(hex, 16), text);
     } else if (oct !== undefined) {
-      yield { type: "int", value: parseInt(oct, 8), text };
+      yield intToken(parseInt(oct, 8), text);
     } else if (char !== undefined) {
       const isWide = text.startsWith("L");
       let type: "wchar" | "char" = isWide ? "wchar" : "char";
@@ -367,7 +347,7 @@ export function* tokenize(
               return "";
             }
             return String.fromCharCode(value);
-          }
+          },
         );
       }
       if (hasErrors) {
@@ -377,8 +357,32 @@ export function* tokenize(
       }
     } else if (id !== undefined) {
       yield { type: "id", value: id, text };
+    } else if (eof !== undefined) {
+      yield { type: "eof", text };
     } else {
       yield { type: "error", text };
+    }
+  }
+
+  function intToken(
+    value: number,
+    text: string,
+    isLong?: boolean,
+    isUnsigned?: boolean,
+  ): Token {
+    let type: "int" | "unsigned int" | "long int" | "unsigned long int" = "int";
+    if (value > ulongMax) {
+      return { type: "error", text };
+    } else if (value > longMax || (isUnsigned && (isLong || value > uintMax))) {
+      return { type: "unsigned long int", value, text };
+    } else if (value > uintMax || isLong) {
+      type = "long int";
+      return { type: "long int", value, text };
+    } else if (value > intMax || isUnsigned) {
+      type = "unsigned int";
+      return { type: "unsigned int", value, text };
+    } else {
+      return { type: "int", value, text };
     }
   }
 }
