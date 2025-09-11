@@ -139,7 +139,7 @@ const tokens = new RegExp(
   /* ws */ `(?:/\\*.*?\\*/|\\s+)*(?:${[
     /* key */ `(${optimize(...keywords, ...operators, ...punctuators)})`,
     /* flt */ `([0-9]+(?:\\.[0-9]*(?:[eE][-+]?[0-9]+)?|[eE][-+]?[0-9]+))[fFlL]?`,
-    /* int */ `([1-9][0-9]*)(?:[uU][lL]?|[lL][uU]?)?`,
+    /* int, flg */ `([1-9][0-9]*)([uU][lL]?|[lL][uU]?)?`,
     /* hex */ `0x([0-9A-Fa-f]+)`,
     /* oct */ `(0[0-7]*)`,
     /* char */ `L?'((?:\\\\(?:[0-7]{1,3}|x[0-9A-Fa-f]+|['"?\\\\abfnrtv])|[^'"\\\\\\n]))'`,
@@ -187,15 +187,14 @@ export function* tokenize(
     wcharMax = 32767,
   } = options ?? {};
   for (const match of input.matchAll(tokens)) {
-    const [text, key, flt, int, hex, oct, char, str, id, eof, err] = match;
+    const [text, key, flt, int, flg, hex, oct, char, str, id, eof] = match;
     if (key !== undefined) {
       yield { type: key as Keyword | Operator | Punctuator, text };
     } else if (flt !== undefined) {
       let type: "float" | "double" | "long double" = "double";
-      if (text.indexOf("f") !== -1 || text.indexOf("F") !== -1) {
+      if (text.endsWith("f") || text.endsWith("F")) {
         type = "float";
-      }
-      if (text.indexOf("l") !== -1 || text.indexOf("L") !== -1) {
+      } else if (text.endsWith("l") || text.endsWith("L")) {
         type = "long double";
       }
       yield { type, value: parseFloat(flt), text };
@@ -203,8 +202,8 @@ export function* tokenize(
       let type: "int" | "unsigned int" | "long int" | "unsigned long int" =
         "int";
       const value = parseInt(int);
-      const isLong = text.indexOf("l") !== -1 || text.indexOf("L") !== -1;
-      const isUnsigned = text.indexOf("u") !== -1 || text.indexOf("U") !== -1;
+      const isLong = flg?.includes("l") || flg?.includes("L");
+      const isUnsigned = flg?.includes("u") || flg?.includes("U");
       yield intToken(value, text, isLong, isUnsigned);
     } else if (hex !== undefined) {
       yield intToken(parseInt(hex, 16), text);
