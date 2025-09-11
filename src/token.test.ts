@@ -11,23 +11,28 @@ import {
 
 function assertTokens(input: string, ...expectedTokens: Token[]) {
   let i = 0;
+  let output = "";
   for (const actual of tokenize(input)) {
     const expected = expectedTokens[i++];
+    output += actual.text;
 
-    if (expected === undefined && actual.type === "eof") {
-      return;
+    if (expected === undefined) {
+      if (actual.type === "eof") {
+        break;
+      }
+      assert.fail(`${input}: Unexpected extra token ${JSON.stringify(actual)}`);
     }
 
     assert.deepEqual(
       actual,
       expected,
-      `${input}: Expected token ${i - 1} to be ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+      `${input}: Expected token ${i - 1} to be ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`
     );
   }
   assert.equal(
-    i,
-    expectedTokens.length,
-    `${input}: Expected ${expectedTokens.length} tokens, got ${i}`,
+    output,
+    input,
+    `Expected input to equal output.`
   );
 }
 
@@ -115,6 +120,87 @@ test("tokenize should parse operators", () => {
   }
 });
 
+test("tokenize should parse a whole source file", () => {
+  const input = `
+int printf(const char *fmt, ...);
+
+int main(int argv, const char **argc) {
+  int i;
+
+  /* Start at one to skip program name */
+  for (i = 1; i < argv; i++) {
+    printf("%s\\n", argc[i]);
+  }
+
+  return 0;
+}
+`;
+
+  assertTokens(
+    input,
+    { type: "int", text: "\nint" },
+    { type: "id", value: "printf", text: " printf" },
+    { type: "(", text: "(" },
+    { type: "const", text: "const" },
+    { type: "char", text: " char" },
+    { type: "*", text: " *" },
+    { type: "id", value: "fmt", text: "fmt" },
+    { type: ",", text: "," },
+    { type: "...", text: " ..." },
+    { type: ")", text: ")" },
+    { type: ";", text: ";" },
+    { type: "int", text: "\n\nint" },
+    { type: "id", value: "main", text: " main" },
+    { type: "(", text: "(" },
+    { type: "int", text: "int" },
+    { type: "id", value: "argv", text: " argv" },
+    { type: ",", text: "," },
+    { type: "const", text: " const" },
+    { type: "char", text: " char" },
+    { type: "*", text: " *" },
+    { type: "*", text: "*" },
+    { type: "id", value: "argc", text: "argc" },
+    { type: ")", text: ")" },
+    { type: "{", text: " {" },
+    { type: "int", text: "\n  int" },
+    { type: "id", value: "i", text: " i" },
+    { type: ";", text: ";" },
+    {
+      type: "for",
+      text: "\n\n  /* Start at one to skip program name */\n  for",
+    },
+    { type: "(", text: " (" },
+    { type: "id", value: "i", text: "i" },
+    { type: "=", text: " =" },
+    { type: "int", value: 1, text: " 1" },
+    { type: ";", text: ";" },
+    { type: "id", value: "i", text: " i" },
+    { type: "<", text: " <" },
+    { type: "id", value: "argv", text: " argv" },
+    { type: ";", text: ";" },
+    { type: "id", value: "i", text: " i" },
+    { type: "++", text: "++" },
+    { type: ")", text: ")" },
+    { type: "{", text: " {" },
+    { type: "id", value: "printf", text: "\n    printf" },
+    { type: "(", text: "(" },
+    { type: "string", value: "%s\n", text: '"%s\\n"' },
+    { type: ",", text: "," },
+    { type: "id", value: "argc", text: " argc" },
+    { type: "[", text: "[" },
+    { type: "id", value: "i", text: "i" },
+    { type: "]", text: "]" },
+    { type: ")", text: ")" },
+    { type: ";", text: ";" },
+    { type: "}", text: "\n  }" },
+    { type: "return", text: "\n\n  return" },
+    { type: "int", value: 0, text: " 0" },
+    { type: ";", text: ";" },
+    { type: "}", text: "\n}" },
+    { type: "eof", text: "\n" }
+  );
+});
+
 test("tokenize should reject invalid input", () => {
   assertTokens(`"unterminated`, { type: "error", text: `"unterminated` });
   assertTokens(`'a`, { type: "error", text: `'a` });
@@ -125,6 +211,6 @@ test("tokenize should reject invalid input", () => {
     { type: "(", text: "(" },
     { type: ")", text: ")" },
     { type: "{", text: " {" },
-    { type: "error", text: " @ }" },
+    { type: "error", text: " @ }" }
   );
 });
