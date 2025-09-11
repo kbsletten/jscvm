@@ -20,11 +20,6 @@ function assertTokens(input, ...tokens) {
   );
 }
 
-test("tokenize should parse #include", () => {
-  assertTokens(`#include <stdio.h>`, { type: "include", value: `<stdio.h>`, text: `#include <stdio.h>` });
-  assertTokens(`#include "header.h"`, { type: "include", value: `"header.h"`, text: `#include "header.h"` });
-});
-
 test("tokenize should parse keywords", () => {
   for (const keyword of keywords) {
     assertTokens(keyword, { type: keyword });
