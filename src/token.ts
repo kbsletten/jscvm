@@ -174,6 +174,8 @@ interface TokenizerOptions {
   wcharMax?: number;
 }
 
+const stringEscape = /\\(?:[0-7]{1,3}|x[0-9A-Fa-f]+|['"?\\abfnrtv])/g;
+
 export function* tokenize(
   input: string,
   options?: TokenizerOptions,
@@ -187,7 +189,17 @@ export function* tokenize(
     wcharMax = 32767,
   } = options ?? {};
   for (const match of input.matchAll(tokens)) {
-    const [text, key, flt, int, flg, hex, oct, char, str, id, eof] = match;
+    const text = match[0];
+    const key = match[1];
+    const flt = match[2];
+    const int = match[3];
+    const flg = match[4];
+    const hex = match[5];
+    const oct = match[6];
+    const char = match[7];
+    const str = match[8];
+    const id = match[9];
+    const eof = match[10];
     if (key !== undefined) {
       yield { type: key as Keyword | Operator | Punctuator, text };
     } else if (flt !== undefined) {
@@ -204,11 +216,34 @@ export function* tokenize(
       const value = parseInt(int);
       const isLong = flg?.includes("l") || flg?.includes("L");
       const isUnsigned = flg?.includes("u") || flg?.includes("U");
-      yield intToken(value, text, isLong, isUnsigned);
+      yield intToken(
+        value,
+        text,
+        ulongMax,
+        longMax,
+        uintMax,
+        intMax,
+        isLong,
+        isUnsigned,
+      );
     } else if (hex !== undefined) {
-      yield intToken(parseInt(hex, 16), text);
+      yield intToken(
+        parseInt(hex, 16),
+        text,
+        ulongMax,
+        longMax,
+        uintMax,
+        intMax,
+      );
     } else if (oct !== undefined) {
-      yield intToken(parseInt(oct, 8), text);
+      yield intToken(
+        parseInt(oct, 8),
+        text,
+        ulongMax,
+        longMax,
+        uintMax,
+        intMax,
+      );
     } else if (char !== undefined) {
       const isWide = text.startsWith("L");
       let type: "wchar" | "char" = isWide ? "wchar" : "char";
@@ -233,17 +268,14 @@ export function* tokenize(
       let hasErrors = false;
       let value = str;
       if (str.indexOf("\\") !== -1) {
-        value = value.replaceAll(
-          /\\(?:[0-7]{1,3}|x[0-9A-Fa-f]+|['"?\\abfnrtv])/g,
-          (char) => {
-            let value: number = parseEscape(char);
-            if (Number.isNaN(value) || value > (isWide ? wcharMax : charMax)) {
-              hasErrors = true;
-              return "";
-            }
-            return String.fromCharCode(value);
-          },
-        );
+        value = value.replaceAll(stringEscape, (char) => {
+          let value: number = parseEscape(char);
+          if (Number.isNaN(value) || value > (isWide ? wcharMax : charMax)) {
+            hasErrors = true;
+            return "";
+          }
+          return String.fromCharCode(value);
+        });
       }
       if (hasErrors) {
         yield { type: "error", text };
@@ -258,116 +290,120 @@ export function* tokenize(
       yield { type: "error", text };
     }
   }
+}
 
-  function intToken(
-    value: number,
-    text: string,
-    isLong?: boolean,
-    isUnsigned?: boolean,
-  ): Token {
-    let type: "int" | "unsigned int" | "long int" | "unsigned long int" = "int";
-    if (value > ulongMax) {
-      return { type: "error", text };
-    } else if (value > longMax || (isUnsigned && (isLong || value > uintMax))) {
-      return { type: "unsigned long int", value, text };
-    } else if (value > uintMax || isLong) {
-      type = "long int";
-      return { type: "long int", value, text };
-    } else if (value > intMax || isUnsigned) {
-      type = "unsigned int";
-      return { type: "unsigned int", value, text };
-    } else {
-      return { type: "int", value, text };
-    }
+function intToken(
+  value: number,
+  text: string,
+  ulongMax: number,
+  longMax: number,
+  uintMax: number,
+  intMax: number,
+  isLong?: boolean,
+  isUnsigned?: boolean,
+): Token {
+  let type: "int" | "unsigned int" | "long int" | "unsigned long int" = "int";
+  if (value > ulongMax) {
+    return { type: "error", text };
+  } else if (value > longMax || (isUnsigned && (isLong || value > uintMax))) {
+    return { type: "unsigned long int", value, text };
+  } else if (value > uintMax || isLong) {
+    type = "long int";
+    return { type: "long int", value, text };
+  } else if (value > intMax || isUnsigned) {
+    type = "unsigned int";
+    return { type: "unsigned int", value, text };
+  } else {
+    return { type: "int", value, text };
   }
+}
 
-  function parseEscape(char: string) {
-    let value = 0;
-    switch (char.charCodeAt(1)) {
-      case 34 /* " */:
-      case 39 /* ' */:
-      case 63 /* ? */:
-      case 92 /* \ */:
-        value = char.charCodeAt(1);
-        if (char.length > 2) {
-          value = NaN;
-        }
-        break;
-      case 48 /* 0 */:
-      case 49 /* 1 */:
-      case 50 /* 2 */:
-      case 51 /* 3 */:
-      case 52 /* 4 */:
-      case 53 /* 5 */:
-      case 54 /* 6 */:
-      case 55 /* 7 */:
-        value = 0;
-        for (let i = 1; i < char.length; i++) {
-          value <<= 3;
-          value += char.charCodeAt(i) - 48;
-        }
-        break;
-      case 88 /* X */:
-      case 120 /* x */:
-        value = 0;
-        for (let i = 2; i < char.length; i++) {
-          value <<= 4;
-          const c = char.charCodeAt(i);
-          if (c >= 48 /* 0 */ && c <= 57 /* 9 */) {
-            value += c - 48;
-          } else if (c >= 65 /* A */ && c <= 70 /* F */) {
-            value += c - 65 + 10;
-          } else {
-            value += c - 97 + 10;
-          }
-        }
-        break;
-      case 97 /* a */:
-        value = 7 /* \a */;
-        if (char.length > 2) {
-          value = NaN;
-        }
-        break;
-      case 98 /* b */:
-        value = 8 /* \b */;
-        if (char.length > 2) {
-          value = NaN;
-        }
-        break;
-      case 102 /* f */:
-        value = 12 /* \f */;
-        if (char.length > 2) {
-          value = NaN;
-        }
-        break;
-      case 110 /* n */:
-        value = 10 /* \n */;
-        if (char.length > 2) {
-          value = NaN;
-        }
-        break;
-      case 114 /* r */:
-        value = 13 /* \r */;
-        if (char.length > 2) {
-          value = NaN;
-        }
-        break;
-      case 116 /* t */:
-        value = 9 /* \t */;
-        if (char.length > 2) {
-          value = NaN;
-        }
-        break;
-      case 118 /* v */:
-        value = 11 /* \v */;
-        if (char.length > 2) {
-          value = NaN;
-        }
-        break;
-      default:
+function parseEscape(char: string) {
+  let value = 0;
+  switch (char.charCodeAt(1)) {
+    case 34 /* " */:
+    case 39 /* ' */:
+    case 63 /* ? */:
+    case 92 /* \ */:
+      value = char.charCodeAt(1);
+      if (char.length > 2) {
         value = NaN;
-        break;
-    }
-    return value;
+      }
+      break;
+    case 48 /* 0 */:
+    case 49 /* 1 */:
+    case 50 /* 2 */:
+    case 51 /* 3 */:
+    case 52 /* 4 */:
+    case 53 /* 5 */:
+    case 54 /* 6 */:
+    case 55 /* 7 */:
+      value = 0;
+      for (let i = 1; i < char.length; i++) {
+        value <<= 3;
+        value += char.charCodeAt(i) - 48;
+      }
+      break;
+    case 88 /* X */:
+    case 120 /* x */:
+      value = 0;
+      for (let i = 2; i < char.length; i++) {
+        value <<= 4;
+        const c = char.charCodeAt(i);
+        if (c >= 48 /* 0 */ && c <= 57 /* 9 */) {
+          value += c - 48;
+        } else if (c >= 65 /* A */ && c <= 70 /* F */) {
+          value += c - 65 + 10;
+        } else {
+          value += c - 97 + 10;
+        }
+      }
+      break;
+    case 97 /* a */:
+      value = 7 /* \a */;
+      if (char.length > 2) {
+        value = NaN;
+      }
+      break;
+    case 98 /* b */:
+      value = 8 /* \b */;
+      if (char.length > 2) {
+        value = NaN;
+      }
+      break;
+    case 102 /* f */:
+      value = 12 /* \f */;
+      if (char.length > 2) {
+        value = NaN;
+      }
+      break;
+    case 110 /* n */:
+      value = 10 /* \n */;
+      if (char.length > 2) {
+        value = NaN;
+      }
+      break;
+    case 114 /* r */:
+      value = 13 /* \r */;
+      if (char.length > 2) {
+        value = NaN;
+      }
+      break;
+    case 116 /* t */:
+      value = 9 /* \t */;
+      if (char.length > 2) {
+        value = NaN;
+      }
+      break;
+    case 118 /* v */:
+      value = 11 /* \v */;
+      if (char.length > 2) {
+        value = NaN;
+      }
+      break;
+    default:
+      value = NaN;
+      break;
   }
+  return value;
 }
