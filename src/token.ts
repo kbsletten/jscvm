@@ -152,11 +152,7 @@ const tokens = new RegExp(
 );
 
 export type Double = "float" | "double" | "long double";
-export type Integer =
-  | "int"
-  | "unsigned int"
-  | "long int"
-  | "unsigned long int";
+export type Integer = "int" | "unsigned int" | "long int" | "unsigned long int";
 export type Char = "char" | "wchar";
 export type String = "string" | "wstring";
 
