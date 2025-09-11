@@ -151,16 +151,25 @@ const tokens = new RegExp(
   "g",
 );
 
+export type Double = "float" | "double" | "long double";
+export type Integer =
+  | "int"
+  | "unsigned int"
+  | "long int"
+  | "unsigned long int";
+export type Char = "char" | "wchar";
+export type String = "string" | "wstring";
+
 export type Token =
   | { type: Keyword | Operator | Punctuator; text: string }
-  | { type: "float" | "double" | "long double"; value: number; text: string }
+  | { type: Double; value: number; text: string }
   | {
-      type: "int" | "unsigned int" | "long int" | "unsigned long int";
+      type: Integer;
       value: number;
       text: string;
     }
-  | { type: "char" | "wchar"; value: number; text: string }
-  | { type: "string" | "wstring"; value: string; text: string }
+  | { type: Char; value: number; text: string }
+  | { type: String; value: string; text: string }
   | { type: "id"; value: string; text: string }
   | { type: "eof"; text: string }
   | { type: "error"; text: string };
@@ -203,7 +212,7 @@ export function* tokenize(
     if (key !== undefined) {
       yield { type: key as Keyword | Operator | Punctuator, text };
     } else if (flt !== undefined) {
-      let type: "float" | "double" | "long double" = "double";
+      let type: Double = "double";
       if (text.endsWith("f") || text.endsWith("F")) {
         type = "float";
       } else if (text.endsWith("l") || text.endsWith("L")) {
@@ -211,8 +220,6 @@ export function* tokenize(
       }
       yield { type, value: parseFloat(flt), text };
     } else if (int !== undefined) {
-      let type: "int" | "unsigned int" | "long int" | "unsigned long int" =
-        "int";
       const value = parseInt(int);
       const isLong = flg?.includes("l") || flg?.includes("L");
       const isUnsigned = flg?.includes("u") || flg?.includes("U");
@@ -246,7 +253,7 @@ export function* tokenize(
       );
     } else if (char !== undefined) {
       const isWide = text.startsWith("L");
-      let type: "wchar" | "char" = isWide ? "wchar" : "char";
+      let type: Char = isWide ? "wchar" : "char";
       let value = char.charCodeAt(0);
       if (value == 92 /* \ */) {
         value = parseEscape(char);
@@ -264,7 +271,7 @@ export function* tokenize(
       }
     } else if (str !== undefined) {
       const isWide = text.startsWith("L");
-      const type: "string" | "wstring" = isWide ? "wstring" : "string";
+      const type: String = isWide ? "wstring" : "string";
       let hasErrors = false;
       let value = str;
       if (str.indexOf("\\") !== -1) {
@@ -302,7 +309,7 @@ function intToken(
   isLong?: boolean,
   isUnsigned?: boolean,
 ): Token {
-  let type: "int" | "unsigned int" | "long int" | "unsigned long int" = "int";
+  let type: Integer = "int";
   if (value > ulongMax) {
     return { type: "error", text };
   } else if (value > longMax || (isUnsigned && (isLong || value > uintMax))) {
