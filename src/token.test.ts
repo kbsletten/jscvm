@@ -1,28 +1,34 @@
 import assert from "node:assert";
 import test from "node:test";
 
-import { keywords, operators, punctuators, tokenize } from "./token.ts";
+import {
+  keywords,
+  operators,
+  punctuators,
+  type Token,
+  tokenize,
+} from "./token.ts";
 
-function assertTokens(input, ...tokens) {
+function assertTokens(input: string, ...expectedTokens: Token[]) {
   let i = 0;
   for (const actual of tokenize(input)) {
-    const expected = tokens[i++];
+    const expected = expectedTokens[i++];
     assert.deepEqual(
       actual,
       expected,
-      `${input}: Expected token ${i - 1} to be ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+      `${input}: Expected token ${i - 1} to be ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`
     );
   }
   assert.equal(
     i,
-    tokens.length,
-    `${input}: Expected ${tokens.length} tokens, got ${i}`,
+    expectedTokens.length,
+    `${input}: Expected ${expectedTokens.length} tokens, got ${i}`
   );
 }
 
 test("tokenize should parse keywords", () => {
   for (const keyword of keywords) {
-    assertTokens(keyword, { type: keyword });
+    assertTokens(keyword, { type: keyword, text: keyword });
   }
 });
 
@@ -50,7 +56,7 @@ test("tokenize should parse integer numbers", () => {
   });
   assertTokens(`12345L`, { type: "long int", value: 12345, text: `12345L` });
   assertTokens(`01234`, { type: "int", value: 668, text: `01234` });
-  assertTokens(`0xCAFE`, { type: "int", value: 51966, text: `0xCAFE` });
+  assertTokens(`0xCAFE`, { type: "unsigned int", value: 51966, text: `0xCAFE` });
   assertTokens(`65535`, { type: "unsigned int", value: 65535, text: `65535` });
   assertTokens(`2147483647`, {
     type: "long int",
@@ -81,12 +87,12 @@ test("tokenize should parse string constants", () => {
 
 test("tokenize should parse punctuators", () => {
   for (const punctuator of punctuators) {
-    assertTokens(punctuator, { type: punctuator });
+    assertTokens(punctuator, { type: punctuator, text: punctuator });
   }
 });
 
 test("tokenize should parse operators", () => {
   for (const operator of operators) {
-    assertTokens(operator, { type: operator });
+    assertTokens(operator, { type: operator, text: operator });
   }
 });

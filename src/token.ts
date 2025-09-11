@@ -136,9 +136,8 @@ function optimize(...tokens: string[]) {
 }
 
 const tokens = new RegExp(
-  [
-    /* com */ `/\\*.*?\\*/`,
-    /* key */ `${optimize(...keywords, ...operators, ...punctuators)}`,
+  /* ws */ `(?:/\\*.*?\\*|\\s+)*(?:${[
+    /* key */ `(${optimize(...keywords, ...operators, ...punctuators)})`,
     /* flt */ `([0-9]+(?:\\.[0-9]*(?:[eE][-+]?[0-9]+)?|[eE][-+]?[0-9]+))[fFlL]?`,
     /* int */ `([1-9][0-9]*)(?:[uU][lL]?|[lL][uU]?)?`,
     /* hex */ `0x([0-9A-Fa-f]+)`,
@@ -147,13 +146,12 @@ const tokens = new RegExp(
     /* str */ `L?"((?:\\\\(?:[0-7]{1,3}|x[0-9A-Fa-f]+|['"?\\\\abfnrtv])|[^"\\\n])*)"`,
     /* id */ `([A-Za-z_][A-Za-z0-9_]*)`,
     /* err */ `(.)`,
-  ].join("|"),
-  "g",
+  ].join("|")})`,
+  "g"
 );
 
 export type Token =
-  | { type: "comment"; text: string }
-  | { type: Keyword | Operator | Punctuator }
+  | { type: Keyword | Operator | Punctuator; text: string }
   | { type: "float" | "double" | "long double"; value: number; text: string }
   | {
       type: "int" | "unsigned int" | "long int" | "unsigned long int";
@@ -176,7 +174,7 @@ interface TokenizerOptions {
 
 export function* tokenize(
   input: string,
-  options?: TokenizerOptions,
+  options?: TokenizerOptions
 ): Generator<Token> {
   const {
     intMax = 32767,
@@ -187,8 +185,10 @@ export function* tokenize(
     wcharMax = 32767,
   } = options ?? {};
   for (const match of input.matchAll(tokens)) {
-    const [text, flt, int, hex, oct, char, str, id, err] = match;
-    if (flt !== undefined) {
+    const [text, key, flt, int, hex, oct, char, str, id, err] = match;
+    if (key !== undefined) {
+      yield { type: key as Keyword | Operator | Punctuator, text };
+    } else if (flt !== undefined) {
       let type: "float" | "double" | "long double" = "double";
       if (text.indexOf("f") !== -1 || text.indexOf("F") !== -1) {
         type = "float";
@@ -210,9 +210,24 @@ export function* tokenize(
       } else if (value > intMax || isUnsigned) {
         type = "unsigned int";
       }
-      yield { type, value, text };
+      if (value > ulongMax) {
+        yield { type: "error", text };
+      } else {
+        yield { type, value, text };
+      }
     } else if (hex !== undefined) {
-      yield { type: "int", value: parseInt(hex, 16), text };
+      const value = parseInt(hex, 16);
+      if (value > ulongMax) {
+        yield { type: "error", text };
+      } else if (value > longMax) {
+        yield { type: "unsigned long int", value, text };
+      } else if (value > uintMax) {
+        yield { type: "long int", value, text };
+      } else if (value > intMax) {
+        yield { type: "unsigned int", value, text };
+      } else {
+        yield { type: "int", value, text };
+      }
     } else if (oct !== undefined) {
       yield { type: "int", value: parseInt(oct, 8), text };
     } else if (char !== undefined) {
@@ -352,7 +367,7 @@ export function* tokenize(
               return "";
             }
             return String.fromCharCode(value);
-          },
+          }
         );
       }
       if (hasErrors) {
@@ -362,12 +377,8 @@ export function* tokenize(
       }
     } else if (id !== undefined) {
       yield { type: "id", value: id, text };
-    } else if (err !== undefined) {
-      yield { type: "error", text };
-    } else if (text.startsWith("/*")) {
-      yield { type: "comment", text };
     } else {
-      yield { type: text as Keyword | Operator | Punctuator };
+      yield { type: "error", text };
     }
   }
 }
