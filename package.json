@@ -7,9 +7,10 @@
   "author": "",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --project tsconfig.build.json",
     "lint": "prettier . --write",
-    "test": "node --test src/**/*.test.ts"
+    "test": "node --test src/**/*.test.ts",
+    "typecheck": "tsc"
   },
   "devDependencies": {
     "@types/node": "^24.3.1",
