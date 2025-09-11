@@ -26,14 +26,10 @@ function assertTokens(input: string, ...expectedTokens: Token[]) {
     assert.deepEqual(
       actual,
       expected,
-      `${input}: Expected token ${i - 1} to be ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`
+      `${input}: Expected token ${i - 1} to be ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
     );
   }
-  assert.equal(
-    output,
-    input,
-    `Expected input to equal output.`
-  );
+  assert.equal(output, input, `Expected input to equal output.`);
 }
 
 test("tokenize should parse whitespace", () => {
@@ -197,7 +193,7 @@ int main(int argv, const char **argc) {
     { type: "int", value: 0, text: " 0" },
     { type: ";", text: ";" },
     { type: "}", text: "\n}" },
-    { type: "eof", text: "\n" }
+    { type: "eof", text: "\n" },
   );
 });
 
@@ -211,6 +207,6 @@ test("tokenize should reject invalid input", () => {
     { type: "(", text: "(" },
     { type: ")", text: ")" },
     { type: "{", text: " {" },
-    { type: "error", text: " @ }" }
+    { type: "error", text: " @ }" },
   );
 });

@@ -214,76 +214,7 @@ export function* tokenize(
       let type: "wchar" | "char" = isWide ? "wchar" : "char";
       let value = char.charCodeAt(0);
       if (value == 92 /* \ */) {
-        switch (char.charCodeAt(1)) {
-          case 34 /* " */:
-          case 39 /* ' */:
-          case 63 /* ? */:
-          case 92 /* \ */:
-            value = char.charCodeAt(1);
-            if (char.length > 2) {
-              value = NaN;
-            }
-            break;
-          case 48 /* 0 */:
-          case 49 /* 1 */:
-          case 50 /* 2 */:
-          case 51 /* 3 */:
-          case 52 /* 4 */:
-          case 53 /* 5 */:
-          case 54 /* 6 */:
-          case 55 /* 7 */:
-            value = parseInt(char.substring(1), 8);
-            break;
-          case 88 /* X */:
-          case 120 /* x */:
-            value = parseInt(char.substring(2), 16);
-            break;
-          case 97 /* a */:
-            value = 7 /* \a */;
-            if (char.length > 2) {
-              value = NaN;
-            }
-            break;
-          case 98 /* b */:
-            value = 8 /* \b */;
-            if (char.length > 2) {
-              value = NaN;
-            }
-            break;
-          case 102 /* f */:
-            value = 12 /* \f */;
-            if (char.length > 2) {
-              value = NaN;
-            }
-            break;
-          case 110 /* n */:
-            value = 10 /* \n */;
-            if (char.length > 2) {
-              value = NaN;
-            }
-            break;
-          case 114 /* r */:
-            value = 13 /* \r */;
-            if (char.length > 2) {
-              value = NaN;
-            }
-            break;
-          case 116 /* t */:
-            value = 9 /* \t */;
-            if (char.length > 2) {
-              value = NaN;
-            }
-            break;
-          case 118 /* v */:
-            value = 11 /* \v */;
-            if (char.length > 2) {
-              value = NaN;
-            }
-            break;
-          default:
-            value = NaN;
-            continue;
-        }
+        value = parseEscape(char);
       } else if (char.length > 1) {
         value = NaN;
       }
@@ -303,44 +234,9 @@ export function* tokenize(
       let value = str;
       if (str.indexOf("\\") !== -1) {
         value = value.replaceAll(
-          /\\(?:([0-7]{1,3})|x([0-9A-Fa-f]+)|(['"?\\abfnrtv]))/g,
-          (src, oct, hex, esc) => {
-            let value: number = 0;
-            if (oct !== undefined) {
-              value = parseInt(oct, 8);
-            } else if (hex !== undefined) {
-              value = parseInt(hex, 16);
-            } else if (esc !== undefined) {
-              switch (esc) {
-                case `'`:
-                case `"`:
-                case `?`:
-                case `\\`:
-                  value = esc.charCodeAt(0);
-                  break;
-                case "a":
-                  value = 7;
-                  break;
-                case "b":
-                  value = 8;
-                  break;
-                case "f":
-                  value = 12;
-                  break;
-                case "n":
-                  value = 10;
-                  break;
-                case "r":
-                  value = 13;
-                  break;
-                case "t":
-                  value = 9;
-                  break;
-                case "v":
-                  value = 11;
-                  break;
-              }
-            }
+          /\\(?:[0-7]{1,3}|x[0-9A-Fa-f]+|['"?\\abfnrtv])/g,
+          (char) => {
+            let value: number = parseEscape(char);
             if (Number.isNaN(value) || value > (isWide ? wcharMax : charMax)) {
               hasErrors = true;
               return "";
@@ -383,5 +279,80 @@ export function* tokenize(
     } else {
       return { type: "int", value, text };
     }
+  }
+
+  function parseEscape(char: string) {
+    let value = 0;
+    switch (char.charCodeAt(1)) {
+      case 34 /* " */:
+      case 39 /* ' */:
+      case 63 /* ? */:
+      case 92 /* \ */:
+        value = char.charCodeAt(1);
+        if (char.length > 2) {
+          value = NaN;
+        }
+        break;
+      case 48 /* 0 */:
+      case 49 /* 1 */:
+      case 50 /* 2 */:
+      case 51 /* 3 */:
+      case 52 /* 4 */:
+      case 53 /* 5 */:
+      case 54 /* 6 */:
+      case 55 /* 7 */:
+        value = parseInt(char.substring(1), 8);
+        break;
+      case 88 /* X */:
+      case 120 /* x */:
+        value = parseInt(char.substring(2), 16);
+        break;
+      case 97 /* a */:
+        value = 7 /* \a */;
+        if (char.length > 2) {
+          value = NaN;
+        }
+        break;
+      case 98 /* b */:
+        value = 8 /* \b */;
+        if (char.length > 2) {
+          value = NaN;
+        }
+        break;
+      case 102 /* f */:
+        value = 12 /* \f */;
+        if (char.length > 2) {
+          value = NaN;
+        }
+        break;
+      case 110 /* n */:
+        value = 10 /* \n */;
+        if (char.length > 2) {
+          value = NaN;
+        }
+        break;
+      case 114 /* r */:
+        value = 13 /* \r */;
+        if (char.length > 2) {
+          value = NaN;
+        }
+        break;
+      case 116 /* t */:
+        value = 9 /* \t */;
+        if (char.length > 2) {
+          value = NaN;
+        }
+        break;
+      case 118 /* v */:
+        value = 11 /* \v */;
+        if (char.length > 2) {
+          value = NaN;
+        }
+        break;
+      default:
+        value = NaN;
+        break;
+    }
+    return value;
   }
 }
