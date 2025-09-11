@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import test from "node:test";
 
-import { keywords, operators, tokenize } from "./token.ts";
+import { keywords, operators, punctuators, tokenize } from "./token.ts";
 
 function assertTokens(input, ...tokens) {
   let i = 0;
@@ -19,6 +19,11 @@ function assertTokens(input, ...tokens) {
     `${input}: Expected ${tokens.length} tokens, got ${i}`,
   );
 }
+
+test("tokenize should parse #include", () => {
+  assertTokens(`#include <stdio.h>`, { type: "include", value: `<stdio.h>`, text: `#include <stdio.h>` });
+  assertTokens(`#include "header.h"`, { type: "include", value: `"header.h"`, text: `#include "header.h"` });
+});
 
 test("tokenize should parse keywords", () => {
   for (const keyword of keywords) {
@@ -77,6 +82,12 @@ test("tokenize should parse string constants", () => {
   assertTokens(`L"a"`, { type: "wstring", value: `a`, text: `L"a"` });
   assertTokens(`"\\0"`, { type: "string", value: `\0`, text: `"\\0"` });
   assertTokens(`"\\\\"`, { type: "string", value: `\\`, text: `"\\\\"` });
+});
+
+test("tokenize should parse punctuators", () => {
+  for (const punctuator of punctuators) {
+    assertTokens(punctuator, { type: punctuator });
+  }
 });
 
 test("tokenize should parse operators", () => {

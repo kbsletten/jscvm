@@ -32,7 +32,7 @@ export const keywords = [
   "volatile",
   "while",
 ] as const;
-export type Keywords = (typeof keywords)[number];
+export type Keyword = (typeof keywords)[number];
 
 export const operators = [
   "[",
@@ -82,10 +82,14 @@ export const operators = [
   "##",
   "#",
 ] as const;
-export type Operators = (typeof operators)[number];
+export type Operator = (typeof operators)[number];
+
+export const punctuators = ["[", "]", "(", ")", "{", "}", "*", ",", ":", "=", ";", "...", "#"];
+export type Punctuator = (typeof punctuators)[number];
 
 const tokens = new RegExp(
   [
+    /* inc */ `#include (<[^>]+>|"[^"]+")`,
     /* key */ `(${keywords.join("|")})`,
     /* flt */ `([0-9]+(?:\\.[0-9]*(?:[eE][-+]?[0-9]+)?|[eE][-+]?[0-9]+))[fFlL]?`,
     /* int */ `([1-9][0-9]*)(?:[uU][lL]?|[lL][uU]?)?`,
@@ -93,6 +97,7 @@ const tokens = new RegExp(
     /* oct */ `(0[0-7]*)`,
     /* char */ `L?'((?:\\\\(?:[0-7]{1,3}|x[0-9A-Fa-f]+|['"?\\\\abfnrtv])|[^'"\\\\\\n]))'`,
     /* str */ `L?"((?:\\\\(?:[0-7]{1,3}|x[0-9A-Fa-f]+|['"?\\\\abfnrtv])|[^"\\\n])*)"`,
+    /* pun */ `(\\{|\\}|,|;|\\.\\.\\.)`,
     /* op */ `(${operators.map((o) => o.replace(/[\[\]\(\)\|\*\+\?\.\^]/g, (s) => `\\${s}`)).join("|")})`,
     /* id */ `([A-Za-z_][A-Za-z0-9_]*)`,
   ].join("|"),
@@ -100,7 +105,8 @@ const tokens = new RegExp(
 );
 
 export type Token =
-  | { type: Keywords }
+  | { type: "include", value: string, text: string }
+  | { type: Keyword }
   | { type: "float" | "double" | "long double"; value: number; text: string }
   | {
       type: "int" | "unsigned int" | "long int" | "unsigned long int";
@@ -109,7 +115,8 @@ export type Token =
     }
   | { type: "char" | "wchar"; value: number; text: string }
   | { type: "string" | "wstring"; value: string; text: string }
-  | { type: Operators }
+  | { type: Operator }
+  | { type: Punctuator }
   | { type: "id"; value: string; text: string }
   | { type: "error"; text: string };
 
@@ -135,9 +142,11 @@ export function* tokenize(
     wcharMax = 32767,
   } = options ?? {};
   for (const match of input.matchAll(tokens)) {
-    const [text, key, flt, int, hex, oct, char, str, op, id] = match;
-    if (key !== undefined) {
-      yield { type: key as Keywords };
+    const [text, inc, key, flt, int, hex, oct, char, str, pun, op, id] = match;
+    if (inc !== undefined) {
+      yield { type: "include", value: inc, text };
+    } else if (key !== undefined) {
+      yield { type: key as Keyword };
     } else if (flt !== undefined) {
       let type: "float" | "double" | "long double" = "double";
       if (text.indexOf("f") !== -1 || text.indexOf("F") !== -1) {
@@ -310,8 +319,10 @@ export function* tokenize(
       } else {
         yield { type, value, text };
       }
+    } else if (pun !== undefined) {
+      yield { type: pun as Punctuator };
     } else if (op !== undefined) {
-      yield { type: op as Operators };
+      yield { type: op as Operator };
     } else if (id !== undefined) {
       yield { type: "id", value: id, text };
     } else {
