@@ -37,7 +37,7 @@ test("preprocessor handles nested #ifdef and #ifndef", () => {
     "#endif",
     "#else",
     "not a",
-    "#endif"
+    "#endif",
   );
   assert.equal(preprocess(input), lines("a", "not b"));
 });
@@ -49,7 +49,7 @@ test("preprocessor does not run inactive branches", () => {
     "#endif",
     "#ifdef B",
     "b",
-    "#endif"
+    "#endif",
   );
   assert.equal(preprocess(input), "");
 });
@@ -63,7 +63,7 @@ test("preprocessor handles #undef", () => {
     "#endif",
     "#ifdef A",
     "not a",
-    "#endif"
+    "#endif",
   );
   assert.equal(preprocess(input), lines("a"));
 });

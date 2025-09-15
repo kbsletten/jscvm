@@ -1,3 +1,5 @@
+import { optimizeRegex } from "./util.ts";
+
 export const keywords = [
   "auto",
   "break",
@@ -98,46 +100,9 @@ export const punctuators = [
 ];
 export type Punctuator = (typeof punctuators)[number];
 
-const terminal = Symbol("terminal");
-interface TokenTrie {
-  [terminal]?: true;
-  [key: string]: TokenTrie;
-}
-
-function optimize(...tokens: string[]) {
-  const trie: TokenTrie = {};
-  for (const token of tokens) {
-    let current: TokenTrie = trie;
-    for (const ch of token) {
-      const key = "{}[]().?+-*^&|\\/".indexOf(ch) === -1 ? ch : `\\${ch}`;
-      if (!(key in current)) {
-        current[key] = {};
-      }
-      current = current[key];
-    }
-    current[terminal] = true;
-  }
-  return toRegex(Object.entries(trie));
-  function toRegex(entries: [string, TokenTrie][]): string {
-    const regex = entries
-      .map(([k, v]) => {
-        const entries = Object.entries(v);
-        return entries.length === 0
-          ? k
-          : v[terminal]
-            ? `${k}(?:${toRegex(entries)})?`
-            : entries.length === 1
-              ? `${k}${toRegex(entries)}`
-              : `${k}(?:${toRegex(entries)})`;
-      })
-      .reduce((l, r) => `${l}|${r}`);
-    return regex;
-  }
-}
-
 const tokens = new RegExp(
   /* ws */ `(?:/\\*.*?\\*/|\\s+)*(?:${[
-    /* key */ `(${optimize(...keywords, ...operators, ...punctuators)})`,
+    /* key */ `(${optimizeRegex(...keywords, ...operators, ...punctuators)})`,
     /* flt */ `([0-9]+(?:\\.[0-9]*(?:[eE][-+]?[0-9]+)?|[eE][-+]?[0-9]+))[fFlL]?`,
     /* int, flg */ `([1-9][0-9]*)([uU][lL]?|[lL][uU]?)?`,
     /* hex */ `0x([0-9A-Fa-f]+)`,
@@ -184,7 +149,7 @@ const stringEscape = /\\(?:[0-7]{1,3}|x[0-9A-Fa-f]+|['"?\\abfnrtv])/g;
 export function* tokenize(
   input: string,
   options?: TokenizerOptions,
-): Generator<Token> {
+): Generator<Token, undefined> {
   const {
     intMax = 32767,
     uintMax = 65535,
