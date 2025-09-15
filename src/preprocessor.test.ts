@@ -75,12 +75,38 @@ test("preprocessor ignores #pragmas", () => {
 });
 
 test("preprocessor performs macro replacement", () => {
+  const input = lines("#define A a", "#define B b", "A", "B", "C");
+  assert.equal(preprocess(input), lines("a", "b", "C"));
+});
+
+test("preprocessor handles recursive macro replacement", () => {
   const input = lines(
-    "#define A a",
-    "#define B b",
+    "#define A B",
+    "#define B C",
+    "#define C D",
     "A",
     "B",
     "C",
   );
-  assert.equal(preprocess(input), lines("a", "b", "C"));
+  assert.equal(preprocess(input), lines("D", "D", "D"));
+});
+
+test("preprocessor handles parameterized macros", () => {
+  const input = lines("#define A(x) x x", "A(a)", "A(b)");
+  assert.equal(preprocess(input), lines("a a", "b b"));
+});
+
+test("preprocessor handles nested parameterized macros", () => {
+  const input = lines(
+    "#define A(x) x x",
+    "#define B(y) A(y) A(y)",
+    "B(a)",
+    "B(b)",
+  );
+  assert.equal(preprocess(input), lines("a a a a", "b b b b"));
+});
+
+test("preprocessor handles parameterized macros with multiple parameters", () => {
+  const input = lines("#define A(x, y) x y", "A(a, b)", "A(b, a)");
+  assert.equal(preprocess(input), lines("a b", "b a"));
 });

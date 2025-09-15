@@ -65,3 +65,31 @@ export class Lookahead<T> {
     this.iterator.return?.(undefined);
   }
 }
+
+export class Context<K, V> extends Map<K, V> {
+  private parent?: Context<K, V>;
+  constructor(parent?: Context<K, V>) {
+    super();
+    this.parent = parent;
+  }
+
+  override has(key: K): boolean {
+    if (super.has(key)) {
+      return true;
+    }
+    if (this.parent !== undefined) {
+      return this.parent.has(key);
+    }
+    return false;
+  }
+
+  override get(key: K): V | undefined {
+    if (super.has(key)) {
+      return super.get(key);
+    }
+    if (this.parent !== undefined) {
+      return this.parent.get(key);
+    }
+    return undefined;
+  }
+}

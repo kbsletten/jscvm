@@ -1,4 +1,4 @@
-import { Lookahead, optimizeRegex } from "./util.ts";
+import { Context, Lookahead, optimizeRegex } from "./util.ts";
 
 const tokenRegex = new RegExp(
   [
@@ -19,12 +19,14 @@ const isWhitespace = /^[ \t\r]+$/;
 
 function* expand(
   src: Iterable<string, undefined>,
-  table: Map<string, string[] | undefined>,
+  symbols: Context<string, [string[], string[]]>,
 ): Generator<string, undefined> {
-  const stack: Lookahead<string>[] = [];
-  let cur: Lookahead<string> | undefined = new Lookahead<string>(src);
+  const stack: [Map<string, [string[], string[]]>, Lookahead<string>][] = [];
+  let cur: Lookahead<string> = new Lookahead<string>(src);
+  let tbl: Context<string, [string[], string[]]> = symbols;
+  let done = false;
   try {
-    while (cur !== undefined) {
+    while (!done) {
       for (let tok = cur.advance(); tok !== undefined; tok = cur.advance()) {
         if (isDef.test(tok)) {
           yield tok;
@@ -37,10 +39,56 @@ function* expand(
             yield tok;
           }
         } else if (isId.test(tok)) {
-          if (table.has(tok)) {
-            const replacement = table.get(tok);
-            if (replacement !== undefined) {
-              stack.push(cur);
+          if (tbl.has(tok)) {
+            const name = tok;
+            const macro = tbl.get(tok);
+            if (macro !== undefined) {
+              const parameters = macro[0];
+              const replacement = macro[1];
+              stack.push([tbl, cur]);
+              if (parameters.length > 0) {
+                tbl = new Context(tbl);
+                let index = 0;
+                tok = cur.advance();
+                if (tok !== "(") {
+                  throw new Error(`Macro ${name} requires parameters`);
+                }
+                tok = cur.advance();
+                while (tok !== undefined && tok !== ")") {
+                  if (isWhitespace.test(tok)) {
+                    tok = cur.advance();
+                    continue;
+                  }
+                  if (index >= parameters.length) {
+                    throw new Error(`Too many arguments for macro ${name}`);
+                  }
+                  const arg = parameters[index++];
+                  const def = [];
+                  let parenDepth = 0;
+                  while (
+                    tok !== undefined &&
+                    (parenDepth > 0 || (tok !== "," && tok !== ")"))
+                  ) {
+                    if (tok === "(") {
+                      parenDepth++;
+                    } else if (tok === ")") {
+                      parenDepth--;
+                    }
+                    def.push(tok);
+                    tok = cur.advance();
+                  }
+                  tbl.set(arg, [[], def]);
+                  if (tok === ",") {
+                    tok = cur.advance();
+                  }
+                }
+                if (tok !== ")") {
+                  throw new Error(`Unterminated macro call for ${name}`);
+                }
+                if (index < parameters.length) {
+                  throw new Error(`Too few arguments for macro ${name}`);
+                }
+              }
               cur = new Lookahead<string>(replacement);
             }
           } else {
@@ -51,12 +99,25 @@ function* expand(
         }
       }
       cur[Symbol.dispose]();
-      cur = stack.pop();
+      const ctx = stack.pop();
+      if (!ctx) {
+        done = true;
+      } else {
+        tbl = ctx[0];
+        cur = ctx[1];
+      }
     }
   } finally {
-    while (cur !== undefined) {
+    let unwound = false;
+    while (!unwound) {
       cur[Symbol.dispose]();
-      cur = stack.pop();
+      const ctx = stack.pop();
+      if (!ctx) {
+        unwound = true;
+      } else {
+        tbl = ctx[0];
+        cur = ctx[1];
+      }
     }
   }
 }
@@ -64,7 +125,7 @@ function* expand(
 export function preprocess(input: string): string {
   const branches: boolean[] = [];
   const output: string[] = [];
-  const symbols = new Map<string, string[]>();
+  const symbols = new Context<string, [string[], string[]]>();
   const tokens = new Lookahead<string>(
     expand(
       input.matchAll(tokenRegex).map((m) => m?.[0]),
@@ -169,8 +230,40 @@ export function preprocess(input: string): string {
           );
         }
         if (isActive) {
-          const def = [];
+          const params = [];
           tok = tokens.advance();
+          if (tok === "(") {
+            tok = tokens.advance();
+            while (tok !== undefined && tok !== ")") {
+              if (isWhitespace.test(tok)) {
+                tok = tokens.advance();
+                if (tok === undefined) {
+                  throw new Error(
+                    `Unexpected end of input in #define parameters`,
+                  );
+                }
+              }
+              if (!isId.test(tok)) {
+                throw new Error(
+                  `Unexpected token in #define parameters ${tok}, expected identifier`,
+                );
+              }
+              params.push(tok);
+              tok = tokens.advance();
+              if (tok !== undefined && isWhitespace.test(tok)) {
+                tok = tokens.advance();
+              }
+              if (tok === ",") {
+                tok = tokens.advance();
+              } else if (tok !== ")") {
+                throw new Error(
+                  `Unexpected token in #define parameters ${tok}, expected , or )`,
+                );
+              }
+            }
+            tok = tokens.advance();
+          }
+          const def = [];
           if (tok !== undefined && isWhitespace.test(tok)) {
             tok = tokens.advance();
           }
@@ -178,7 +271,7 @@ export function preprocess(input: string): string {
             def.push(tok);
             tok = tokens.advance();
           }
-          symbols.set(id, def);
+          symbols.set(id, [params, def]);
         } else {
           while (tok !== undefined && tok !== "\n") {
             tok = tokens.advance();
