@@ -17,46 +17,59 @@ const isDef = new RegExp(
 const isId = /^[A-Za-z_]/;
 const isWhitespace = /^[ \t\r]+$/;
 
+type Macro = [string[], string[]];
+
 function* expand(
   src: Iterable<string, undefined>,
-  symbols: Context<string, [string[], string[]]>,
+  symbols: Context<string, Macro>,
 ): Generator<string, undefined> {
-  const stack: [Map<string, [string[], string[]]>, Lookahead<string>][] = [];
-  let cur: Lookahead<string> = new Lookahead<string>(src);
-  let tbl: Context<string, [string[], string[]]> = symbols;
-  let done = false;
+  const stack: {
+    tokens: Lookahead<string>;
+    symbols: Context<string, Macro>;
+  }[] = [];
+  let ctx:
+    | {
+        tokens: Lookahead<string>;
+        symbols: Context<string, Macro>;
+      }
+    | undefined = { tokens: new Lookahead<string>(src), symbols };
   try {
-    while (!done) {
-      for (let tok = cur.advance(); tok !== undefined; tok = cur.advance()) {
+    while (ctx !== undefined) {
+      for (
+        let tok = ctx.tokens.advance();
+        tok !== undefined;
+        tok = ctx.tokens.advance()
+      ) {
         if (isDef.test(tok)) {
           yield tok;
-          tok = cur.advance();
+          tok = ctx.tokens.advance();
           if (tok === undefined) continue;
           yield tok;
           if (isWhitespace.test(tok)) {
-            tok = cur.advance();
+            tok = ctx.tokens.advance();
             if (tok === undefined) continue;
             yield tok;
           }
         } else if (isId.test(tok)) {
-          if (tbl.has(tok)) {
+          if (ctx.symbols.has(tok)) {
             const name = tok;
-            const macro = tbl.get(tok);
+            const macro: Macro | undefined = ctx.symbols.get(tok);
             if (macro !== undefined) {
               const parameters = macro[0];
-              const replacement = macro[1];
-              stack.push([tbl, cur]);
+              const replacement: string[] = macro[1];
+              let tbl: Context<string, Macro> = ctx.symbols;
+              stack.push(ctx);
               if (parameters.length > 0) {
-                tbl = new Context(tbl);
+                tbl = new Context(ctx.symbols);
                 let index = 0;
-                tok = cur.advance();
+                tok = ctx.tokens.advance();
                 if (tok !== "(") {
                   throw new Error(`Macro ${name} requires parameters`);
                 }
-                tok = cur.advance();
+                tok = ctx.tokens.advance();
                 while (tok !== undefined && tok !== ")") {
                   if (isWhitespace.test(tok)) {
-                    tok = cur.advance();
+                    tok = ctx.tokens.advance();
                     continue;
                   }
                   if (index >= parameters.length) {
@@ -75,11 +88,11 @@ function* expand(
                       parenDepth--;
                     }
                     def.push(tok);
-                    tok = cur.advance();
+                    tok = ctx.tokens.advance();
                   }
                   tbl.set(arg, [[], def]);
                   if (tok === ",") {
-                    tok = cur.advance();
+                    tok = ctx.tokens.advance();
                   }
                 }
                 if (tok !== ")") {
@@ -89,7 +102,10 @@ function* expand(
                   throw new Error(`Too few arguments for macro ${name}`);
                 }
               }
-              cur = new Lookahead<string>(replacement);
+              ctx = {
+                tokens: new Lookahead<string>(replacement),
+                symbols: tbl,
+              };
             }
           } else {
             yield tok;
@@ -98,26 +114,13 @@ function* expand(
           yield tok;
         }
       }
-      cur[Symbol.dispose]();
-      const ctx = stack.pop();
-      if (!ctx) {
-        done = true;
-      } else {
-        tbl = ctx[0];
-        cur = ctx[1];
-      }
+      ctx.tokens[Symbol.dispose]();
+      ctx = stack.pop();
     }
   } finally {
-    let unwound = false;
-    while (!unwound) {
-      cur[Symbol.dispose]();
-      const ctx = stack.pop();
-      if (!ctx) {
-        unwound = true;
-      } else {
-        tbl = ctx[0];
-        cur = ctx[1];
-      }
+    while (ctx !== undefined) {
+      ctx.tokens[Symbol.dispose]();
+      ctx = stack.pop();
     }
   }
 }
@@ -125,7 +128,7 @@ function* expand(
 export function preprocess(input: string): string {
   const branches: boolean[] = [];
   const output: string[] = [];
-  const symbols = new Context<string, [string[], string[]]>();
+  const symbols = new Context<string, Macro>();
   const tokens = new Lookahead<string>(
     expand(
       input.matchAll(tokenRegex).map((m) => m?.[0]),
