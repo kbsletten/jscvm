@@ -73,3 +73,14 @@ test("preprocessor ignores #pragmas", () => {
 
   assert.equal(preprocess(input), lines("a"));
 });
+
+test("preprocessor performs macro replacement", () => {
+  const input = lines(
+    "#define A a",
+    "#define B b",
+    "A",
+    "B",
+    "C",
+  );
+  assert.equal(preprocess(input), lines("a", "b", "C"));
+});

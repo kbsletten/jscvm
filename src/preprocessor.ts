@@ -8,18 +8,18 @@ const tokenRegex = new RegExp(
     /* nl */ `\\n`,
     /* txt */ `(?:\\\\(?:.|\\n)|[^\\n(),A-Za-z_])+`,
   ].join("|"),
-  "gm"
+  "gm",
 );
 
 const isDef = new RegExp(
-  `^#${optimizeRegex("ifdef", "ifndef", "define", "undef")}$`
+  `^#${optimizeRegex("ifdef", "ifndef", "define", "undef")}$`,
 );
 const isId = /^[A-Za-z_]/;
 const isWhitespace = /^[ \t\r]+$/;
 
 function* expand(
   src: Iterable<string, undefined>,
-  table: Map<string, string[] | undefined>
+  table: Map<string, string[] | undefined>,
 ): Generator<string, undefined> {
   const stack: Lookahead<string>[] = [];
   let cur: Lookahead<string> | undefined = new Lookahead<string>(src);
@@ -68,8 +68,8 @@ export function preprocess(input: string): string {
   const tokens = new Lookahead<string>(
     expand(
       input.matchAll(tokenRegex).map((m) => m?.[0]),
-      symbols
-    )
+      symbols,
+    ),
   );
   for (let tok = tokens.advance(); tok !== undefined; tok = tokens.advance()) {
     const isActive = branches.every((b) => b);
@@ -80,13 +80,13 @@ export function preprocess(input: string): string {
         tok = tokens.advance();
         if (tok === undefined || !isWhitespace.test(tok)) {
           throw new Error(
-            `Unexpected token in #ifdef ${tok}, expected whitespace`
+            `Unexpected token in #ifdef ${tok}, expected whitespace`,
           );
         }
         tok = tokens.advance();
         if (tok === undefined || !isId.test(tok)) {
           throw new Error(
-            `Unexpected token in #ifdef ${tok}, expected identifier`
+            `Unexpected token in #ifdef ${tok}, expected identifier`,
           );
         }
         if (symbols.has(tok)) {
@@ -100,20 +100,20 @@ export function preprocess(input: string): string {
         }
         if (tok !== "\n") {
           throw new Error(
-            `Unexpected token in #ifdef ${tok}, expected newline`
+            `Unexpected token in #ifdef ${tok}, expected newline`,
           );
         }
       } else if (tok === "#ifndef") {
         tok = tokens.advance();
         if (tok === undefined || !isWhitespace.test(tok)) {
           throw new Error(
-            `Unexpected token in #ifndef ${tok}, expected whitespace`
+            `Unexpected token in #ifndef ${tok}, expected whitespace`,
           );
         }
         tok = tokens.advance();
         if (tok === undefined || !isId.test(tok)) {
           throw new Error(
-            `Unexpected token in #ifndef ${tok}, expected identifier`
+            `Unexpected token in #ifndef ${tok}, expected identifier`,
           );
         }
         if (symbols.has(tok)) {
@@ -127,7 +127,7 @@ export function preprocess(input: string): string {
         }
         if (tok !== "\n") {
           throw new Error(
-            `Unexpected token in #ifndef ${tok}, expected newline`
+            `Unexpected token in #ifndef ${tok}, expected newline`,
           );
         }
       } else if (tok === "#elif") {
@@ -150,7 +150,7 @@ export function preprocess(input: string): string {
         }
         if (tok !== "\n") {
           throw new Error(
-            `Unexpected token in #endif ${tok}, expected newline`
+            `Unexpected token in #endif ${tok}, expected newline`,
           );
         }
       } else if (tok === "#include") {
@@ -159,18 +159,21 @@ export function preprocess(input: string): string {
         tok = tokens.advance();
         if (tok === undefined || !isWhitespace.test(tok)) {
           throw new Error(
-            `Unexpected token in #define ${tok}, expected whitespace`
+            `Unexpected token in #define ${tok}, expected whitespace`,
           );
         }
         const id = tokens.advance();
         if (id === undefined || !isId.test(id)) {
           throw new Error(
-            `Unexpected token in #define ${id}, expected identifier`
+            `Unexpected token in #define ${id}, expected identifier`,
           );
         }
         if (isActive) {
           const def = [];
           tok = tokens.advance();
+          if (tok !== undefined && isWhitespace.test(tok)) {
+            tok = tokens.advance();
+          }
           while (tok !== undefined && tok !== "\n") {
             def.push(tok);
             tok = tokens.advance();
@@ -185,13 +188,13 @@ export function preprocess(input: string): string {
         tok = tokens.advance();
         if (tok === undefined || !isWhitespace.test(tok)) {
           throw new Error(
-            `Unexpected token in #undef ${tok}, expected whitespace`
+            `Unexpected token in #undef ${tok}, expected whitespace`,
           );
         }
         tok = tokens.advance();
         if (tok === undefined || !isId.test(tok)) {
           throw new Error(
-            `Unexpected token in #undef ${tok}, expected identifier`
+            `Unexpected token in #undef ${tok}, expected identifier`,
           );
         }
         if (isActive) {
@@ -203,7 +206,7 @@ export function preprocess(input: string): string {
         }
         if (tok !== "\n") {
           throw new Error(
-            `Unexpected token in #undef ${tok}, expected newline`
+            `Unexpected token in #undef ${tok}, expected newline`,
           );
         }
       } else if (tok === "#error") {
