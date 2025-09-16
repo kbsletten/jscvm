@@ -6,7 +6,8 @@ const tokenRegex = new RegExp(
     /* op */ `${optimizeRegex("(", ")", ",", "##", "#", "+", "-", "*", "/", "%", "&&", "&", "||", "|", "^", "~", "!=", "!", "==", "<<", "<", ">>", ">", "?", ":")}`,
     /* id */ `[A-Za-z_][A-Za-z0-9_]*`,
     /* nl */ `\\n`,
-    /* txt */ `(?:\\\\(?:.|\\n)|[^\\n(),A-Za-z_])+`,
+    /* ws */ `[ \\t\\r]+`,
+    /* txt */ `(?:\\\\(?:.|\\n)|[^ \\n\\t\\r(),#+\\-*/%&|^~!=<>?:A-Za-z_])+`,
   ].join("|"),
   "gm",
 );
@@ -19,20 +20,24 @@ const isWhitespace = /^[ \t\r]+$/;
 
 type Macro = [string[], string[]];
 
+function stringize(str: string[]): string {
+  return `"${str.join("").replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
 function* expand(
   src: Iterable<string, undefined>,
   symbols: Context<string, Macro>,
 ): Generator<string, undefined> {
-  const stack: {
+  interface Ctx {
     tokens: Lookahead<string>;
     symbols: Context<string, Macro>;
-  }[] = [];
-  let ctx:
-    | {
-        tokens: Lookahead<string>;
-        symbols: Context<string, Macro>;
-      }
-    | undefined = { tokens: new Lookahead<string>(src), symbols };
+    stringizing?: string[];
+  }
+  const stack: Ctx[] = [];
+  let ctx: Ctx | undefined = {
+    tokens: new Lookahead<string>(src),
+    symbols,
+  };
   try {
     while (ctx !== undefined) {
       for (
@@ -40,14 +45,27 @@ function* expand(
         tok !== undefined;
         tok = ctx.tokens.advance()
       ) {
+        let stringizing: string[] | undefined = ctx.stringizing;
+        for (
+          let i = stack.length - 1;
+          stringizing === undefined && i >= 0;
+          i--
+        ) {
+          stringizing = stack[i].stringizing;
+        }
+        if (
+          stringizing !== undefined &&
+          tok !== "#" &&
+          tok !== "##" &&
+          tok.startsWith("#")
+        ) {
+          throw new Error("Cannot process directives while stringizing");
+        }
         if (isDef.test(tok)) {
           yield tok;
-          tok = ctx.tokens.advance();
-          if (tok === undefined) continue;
-          yield tok;
-          if (isWhitespace.test(tok)) {
+          while (tok !== "\n") {
             tok = ctx.tokens.advance();
-            if (tok === undefined) continue;
+            if (tok === undefined) break;
             yield tok;
           }
         } else if (isId.test(tok)) {
@@ -108,14 +126,36 @@ function* expand(
               };
             }
           } else {
+            if (stringizing !== undefined) {
+              stringizing.push(tok);
+              if (ctx.stringizing === stringizing) {
+                yield stringize(stringizing);
+                ctx.stringizing = undefined;
+              }
+            } else {
+              yield tok;
+            }
+          }
+        } else if (tok === "#") {
+          ctx.stringizing = [];
+        } else {
+          if (stringizing !== undefined) {
+            stringizing.push(tok);
+            if (ctx.stringizing === stringizing) {
+              yield stringize(stringizing);
+              ctx.stringizing = undefined;
+            }
+          } else {
             yield tok;
           }
-        } else {
-          yield tok;
         }
       }
       ctx.tokens[Symbol.dispose]();
       ctx = stack.pop();
+      if (ctx?.stringizing !== undefined) {
+        yield stringize(ctx.stringizing);
+        ctx.stringizing = undefined;
+      }
     }
   } finally {
     while (ctx !== undefined) {

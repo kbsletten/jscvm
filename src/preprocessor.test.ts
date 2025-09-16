@@ -115,3 +115,8 @@ test("preprocessor handles parenthesis in parameterized macros", () => {
   const input = lines("#define A(x) (x)", "A(a + b)", "A((a + b) * c)");
   assert.equal(preprocess(input), lines("(a + b)", "((a + b) * c)"));
 });
+
+test("preprocessor handles stringizing", () => {
+  const input = lines("#define A(x) #1 #x", "A(a)", "A(b a d)");
+  assert.equal(preprocess(input), lines('"1" "a"', '"1" "b a d"'));
+});
