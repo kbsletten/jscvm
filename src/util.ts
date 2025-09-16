@@ -73,21 +73,21 @@ export class Context<K, V> extends Map<K, V> {
     this.parent = parent;
   }
 
-  override has(key: K): boolean {
+  override has(key: K, inherit = true): boolean {
     if (super.has(key)) {
       return true;
     }
-    if (this.parent !== undefined) {
+    if (inherit && this.parent !== undefined) {
       return this.parent.has(key);
     }
     return false;
   }
 
-  override get(key: K): V | undefined {
+  override get(key: K, inherit = true): V | undefined {
     if (super.has(key)) {
       return super.get(key);
     }
-    if (this.parent !== undefined) {
+    if (inherit && this.parent !== undefined) {
       return this.parent.get(key);
     }
     return undefined;

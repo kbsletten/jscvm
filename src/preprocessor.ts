@@ -45,16 +45,8 @@ function* expand(
         tok !== undefined;
         tok = ctx.tokens.advance()
       ) {
-        let stringizing: string[] | undefined = ctx.stringizing;
-        for (
-          let i = stack.length - 1;
-          stringizing === undefined && i >= 0;
-          i--
-        ) {
-          stringizing = stack[i].stringizing;
-        }
         if (
-          stringizing !== undefined &&
+          ctx.stringizing !== undefined &&
           tok !== "#" &&
           tok !== "##" &&
           tok.startsWith("#")
@@ -125,37 +117,49 @@ function* expand(
                 symbols: tbl,
               };
             }
-          } else {
-            if (stringizing !== undefined) {
-              stringizing.push(tok);
-              if (ctx.stringizing === stringizing) {
-                yield stringize(stringizing);
-                ctx.stringizing = undefined;
-              }
-            } else {
-              yield tok;
-            }
-          }
-        } else if (tok === "#") {
-          ctx.stringizing = [];
-        } else {
-          if (stringizing !== undefined) {
-            stringizing.push(tok);
-            if (ctx.stringizing === stringizing) {
-              yield stringize(stringizing);
-              ctx.stringizing = undefined;
-            }
+          } else if (ctx.stringizing !== undefined) {
+            ctx.stringizing.push(tok);
           } else {
             yield tok;
           }
+        } else if (tok === "#") {
+          tok = ctx.tokens.advance();
+
+          if (tok === undefined || !isId.test(tok)) {
+            throw new Error(`Unexpected token after #: ${tok}`);
+          }
+
+          if (!ctx.symbols.has(tok, false)) {
+            throw new Error(`Cannot stringize ${tok}`);
+          }
+
+          const macro: Macro | undefined = ctx.symbols.get(tok, false);
+
+          if (macro === undefined || macro[0].length > 0) {
+            throw new Error(`Cannot stringize ${tok}`);
+          }
+
+          const replacement: string[] = macro[1];
+          let tbl: Context<string, Macro> = ctx.symbols;
+          stack.push(ctx);
+
+          ctx = {
+            tokens: new Lookahead<string>(replacement),
+            symbols: tbl,
+            stringizing: [],
+          };
+        } else if (ctx.stringizing !== undefined) {
+          ctx.stringizing.push(tok);
+        } else {
+          yield tok;
         }
       }
-      ctx.tokens[Symbol.dispose]();
-      ctx = stack.pop();
       if (ctx?.stringizing !== undefined) {
         yield stringize(ctx.stringizing);
         ctx.stringizing = undefined;
       }
+      ctx.tokens[Symbol.dispose]();
+      ctx = stack.pop();
     }
   } finally {
     while (ctx !== undefined) {
